@@ -1,5 +1,6 @@
 import * as core from '@actions/core'
-import {exec} from '../utils/cache'
+import * as fs from 'fs'
+import * as path from 'path'
 
 async function run(): Promise<void> {
   try {
@@ -8,33 +9,32 @@ async function run(): Promise<void> {
 
     if (cacheHit === 'false') {
       const cachePath = core.getState('cache-path')
-      const path = core.getState('path')
+      const sourcePath = core.getState('path')
 
-      await exec(`mkdir -p ${cachePath}`)
+      // Create cache directory if it doesn't exist (using fs API)
+      await fs.promises.mkdir(cachePath, {recursive: true})
 
-      // Check if the target cache directory already exists before moving
-      const pathBasename = path.split('/').pop()
-      const targetPath = `${cachePath}/${pathBasename}`
+      // Get basename safely using Node.js path module
+      const pathBasename = path.basename(sourcePath)
+      const targetPath = path.join(cachePath, pathBasename)
 
-      try {
-        await exec(`test -d ${targetPath}`)
+      // Check if the target cache directory already exists
+      if (fs.existsSync(targetPath)) {
         core.info(
           `Cache already exists at ${targetPath}, skipping save (likely saved by another parallel job)`
         )
-      } catch {
-        // Target doesn't exist, proceed with mv
-        try {
-          const mv = await exec(`mv ./${path} ${cachePath}`)
-          core.debug(mv.stdout)
-          if (!mv.stderr) {
-            core.info(`Cache saved with key ${key}`)
-          }
-        } catch (mvError) {
-          // mv failed (another job may have saved concurrently)
-          core.info(
-            `Failed to save cache (another job may have saved it concurrently), continuing without error`
-          )
-        }
+        return
+      }
+
+      // Target doesn't exist, proceed with rename/move
+      try {
+        await fs.promises.rename(`./${sourcePath}`, targetPath)
+        core.info(`Cache saved with key ${key}`)
+      } catch (mvError) {
+        // rename failed (another job may have saved concurrently)
+        core.info(
+          `Failed to save cache (another job may have saved it concurrently), continuing without error`
+        )
       }
     } else {
       core.info(`Cache hit on the key ${key}`)
