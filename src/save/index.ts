@@ -11,16 +11,35 @@ async function run(): Promise<void> {
       const path = core.getState('path')
 
       await exec(`mkdir -p ${cachePath}`)
-      const mv = await exec(`mv ./${path} ${cachePath}`)
 
-      core.debug(mv.stdout)
-      if (mv.stderr) core.error(mv.stderr)
-      if (!mv.stderr) core.info(`Cache saved with key ${key}`)
+      // Check if the target cache directory already exists before moving
+      const pathBasename = path.split('/').pop()
+      const targetPath = `${cachePath}/${pathBasename}`
+
+      try {
+        await exec(`test -d ${targetPath}`)
+        core.info(
+          `Cache already exists at ${targetPath}, skipping save (likely saved by another parallel job)`
+        )
+      } catch {
+        // Target doesn't exist, proceed with mv
+        try {
+          const mv = await exec(`mv ./${path} ${cachePath}`)
+          core.debug(mv.stdout)
+          if (!mv.stderr) {
+            core.info(`Cache saved with key ${key}`)
+          }
+        } catch (mvError) {
+          // mv failed (another job may have saved concurrently)
+          core.info(
+            `Failed to save cache (another job may have saved it concurrently), continuing without error`
+          )
+        }
+      }
     } else {
       core.info(`Cache hit on the key ${key}`)
       core.info(`,not saving cache`)
     }
-
   } catch (error) {
     if (error instanceof Error) core.setFailed(error.message)
   }
