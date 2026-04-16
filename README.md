@@ -16,6 +16,9 @@ See the [v1 README.md](https://github.com/corca-ai/local-cache/blob/v1/README.md
 ### Pre-requisites
 
 Create a workflow .yml file in your repository's .github/workflows directory.
+
+This action runs on the Node.js 24 runtime, which requires GitHub Actions runner v2.327.1 or later. Self-hosted runners must be updated to that release before using this action.
+
 ### Inputs
 
 | Parameter   | Required/Optional | Description                                                                                   | Default                      |
